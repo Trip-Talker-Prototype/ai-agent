@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.115.13",
     "langchain>=0.3.26",
     "langchain-community>=0.3.26",
+    "langchain-openai>=0.3.25",
     "openai>=1.90.0",
     "pandas>=2.3.0",
     "pgvector>=0.4.1",

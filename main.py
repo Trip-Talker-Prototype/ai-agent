@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 
-app = FastAPI()
+from dotenv import load_dotenv
 
-@app.get("/")
-def hello_world():
-    return "Hello World!"
+from api.chatbot.views import chat_router
+
+load_dotenv()
+
+app = FastAPI()
+app.include_router(chat_router)
