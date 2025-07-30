@@ -9,20 +9,19 @@ class APIMessageParams(BaseModel):
     """
     Request query params with api key and message
     """
-
-    llm_model_id: UUID
+    
     message: str
-    conversation_id: Optional[str] = ""
+    # conversation_id: Optional[str] = ""
 
 
 class MessageDataResponse(BaseModel):
     """
     Response model for getting the list with pagination
     """
-    id: UUID
-    conversation_id: UUID
-    integration_wizard_id: UUID | None = None
+    # id: UUID
+    # conversation_id: UUID
     content: str
     metadata: dict | None = None
     token_usage: dict | None = None
     created_at: datetime
+    
