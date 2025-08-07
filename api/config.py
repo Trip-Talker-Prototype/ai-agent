@@ -32,10 +32,10 @@ class Settings(BaseSettings):
     CORS_ALLOW_HEADERS: str = "*"
 
     # # Langchain Settings
-    # LANGCHAIN_TRACING_V2: str
-    # LANGCHAIN_ENDPOINT: str
-    # LANGCHAIN_API_KEY: str
-    # LANGCHAIN_PROJECT: str
+    LANGCHAIN_TRACING_V2: str
+    LANGCHAIN_ENDPOINT: str
+    LANGCHAIN_API_KEY: str
+    LANGCHAIN_PROJECT: str
 
     # # MinIO Settings
     # MINIO_ENDPOINT: str
@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     # MINIO_REGION: str
     # MINIO_SECURE: bool
     # MINIO_BUCKET: str
+
+    # # Github Settings
+    GITHUB_API: str
+
+    # # Proxy Setting
+    PROXY_CURL_API: str
+
+    # # Taviliy Settings
+    TAVILY_API_KEY: str
 
     # # Redis
     # REDIS_HOST: str
