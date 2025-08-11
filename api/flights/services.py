@@ -46,7 +46,7 @@ class FlightServices:
                 documents=[docs],
                 embedding=self.embeddings,
                 connection_string=connection_url,
-                collection_name="ai_agent_gogo"
+                collection_name="triptalker_ai_agent"
             )
             
             print("Vector store berhasil disetup!")
