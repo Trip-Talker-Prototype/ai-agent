@@ -1,3 +1,5 @@
+import logging
+
 from langchain_community.llms import OpenAI
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import PGVector
@@ -43,6 +45,8 @@ class FlightServices:
                 page_content=schemas.schemas,
             )
 
+            logging.info(f"Add {docs} as {settings.POSTGRES_DB} collections")
+
             self.vector_store = PGVector.from_documents(
                 documents=[docs],
                 embedding=self.embeddings,
@@ -54,6 +58,6 @@ class FlightServices:
             return self.vector_store
             
         except Exception as e:
-            print(f"Error setting up vector store: {e}")
+            logging.error(f"Error setting up vector store: {e}")
 
         
