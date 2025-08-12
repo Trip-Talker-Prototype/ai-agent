@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from api.flights.repositories import FlightRepositories
 from api.flights.schemas import FlightsFilter, FlightsVectorRequest
 from api.database.client import connection_url
+from api.config import settings
 
 class FlightServices:
     def __init__(
@@ -46,7 +47,7 @@ class FlightServices:
                 documents=[docs],
                 embedding=self.embeddings,
                 connection_string=connection_url,
-                collection_name="triptalker_ai_agent"
+                collection_name=settings.POSTGRES_DB
             )
             
             print("Vector store berhasil disetup!")
