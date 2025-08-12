@@ -1,3 +1,5 @@
+import logging
+
 from langchain_community.llms import OpenAI
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import PGVector
@@ -10,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from api.flights.repositories import FlightRepositories
 from api.flights.schemas import FlightsFilter, FlightsVectorRequest
 from api.database.client import connection_url
+from api.config import settings
 
 class FlightServices:
     def __init__(
@@ -42,17 +45,19 @@ class FlightServices:
                 page_content=schemas.schemas,
             )
 
+            logging.info(f"Add {docs} as {settings.POSTGRES_DB} collections")
+
             self.vector_store = PGVector.from_documents(
                 documents=[docs],
                 embedding=self.embeddings,
                 connection_string=connection_url,
-                collection_name="triptalker_ai_agent"
+                collection_name=settings.POSTGRES_DB
             )
             
             print("Vector store berhasil disetup!")
             return self.vector_store
             
         except Exception as e:
-            print(f"Error setting up vector store: {e}")
+            logging.error(f"Error setting up vector store: {e}")
 
         
