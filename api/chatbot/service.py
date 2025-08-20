@@ -9,6 +9,7 @@ from langchain_community.llms import OpenAI
 
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.sql import text
+from sqlalchemy.exc import ProgrammingError
 
 from api.chatbot.schemas import APIMessageParams, MessageDataResponse
 from api.chatbot.repositories import ChatBotRepositories
@@ -64,6 +65,21 @@ class ChatBotAI:
         SCHEMA DATABASE:
         {context}
 
+        Informasi Terkait Skema:
+ 
+        Table: flights_prices
+        id: ID unik untuk setiap row
+        flight_number: nomor penerbangan yang dikombinasikan dengan huruf. contoh GA123
+        "class": tipe kelas dari penerbangan tsb
+        base_price: harga sebelum dikenakan pajak
+        tax: nominal besar pajak
+        fee: biaya admin yang dikenakan
+        currency: mata uang yang dipakai
+        valid_from: waktu awal tersedia 
+        valid_to: waktu akhir tersedia atau kadaluarsanya
+        created_at: kapan data diubuat
+        updated_at: kapan data diubah
+
         ATURAN PENTING:
         1. Gunakan HANYA tabel dan kolom yang ada di schema
         2. Pastikan sintaks PostgreSQL yang benar
@@ -98,11 +114,41 @@ class ChatBotAI:
                 sql_query = sql_query[:-3]
             
             print("SQL Query :", sql_query)
-            results = await self.execute_query(conn=conn, sql_query=sql_query)
 
-            # Report Agent
-            report = await self.report_agent(question=params.message, result_query=results)
-            return report
+            try:
+                results = await self.execute_query(conn=conn, sql_query=sql_query)
+
+                # Report Agent
+                report = await self.report_agent(question=params.message, result_query=results)
+                return report
+            
+            except ProgrammingError as e:
+                str_error = str(e)
+
+                prompt_template = """
+                Kamu adalah data analyst yang ahli yang dimana kamu bekerja untuk suatu pelayanan penerbangan. Kamu akan diberikan suatu error log dan pertanyaan dari user.
+                Berikan informasi kepada user mengapa kesalahan dapat terjadi. Bisa jadi user bertanya diluar batas pengetahuanmu.
+
+                contoh:
+                question: siapa presiden singapura
+                answer: maaf kami tidak mengetahui jawaban mengenai permintaan anda. silahkan bertanya seputar tiket dan penerbangan yang kamu mau tahu ya.
+
+                INSTRUKSI:
+                1. JAWAB pertanyaan user secara LANGSUNG. Kamu boleh memodifikasi jawaban dengan lebih natural dan enak dibaca oleh user
+
+                question: {question}
+                error message: {error_message}
+                """
+
+                prompt = PromptTemplate(
+                    template=prompt_template,
+                    input_variables=["question", "error_message"]
+                )
+                formatted_prompt = prompt.format(question=params.message, error_message=str_error)
+                report = self.model.invoke(formatted_prompt)
+
+                return report
+                 
     
     async def execute_query(
             self,
