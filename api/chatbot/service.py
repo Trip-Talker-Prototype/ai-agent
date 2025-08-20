@@ -21,12 +21,12 @@ class ChatBotAI:
         ):
         self.prompt = params.message
         self.llm = OpenAI(temperature = 0)
-
-    async def chat(self) -> MessageDataResponse:
         self.model = init_chat_model(
             model="gpt-4o-mini",
             stream_usage=True,
         )
+
+    async def chat(self) -> MessageDataResponse:
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", "Provide a clear, in-depth, and easy-to-understand answer to the following question"),
@@ -59,7 +59,7 @@ class ChatBotAI:
 
             context = "\n\n".join([doc.document for doc in results])
             prompt_template = """
-        Anda adalah expert SQL developer yang akan mengkonversi pertanyaan bahasa natural ke SQL query.
+        Anda adalah expert SQL developer yang akan mengkonversi pertanyaan bahasa natural ke SQL query. Kamu akan menggunakan PostgreSQL untuk melakakukan task ini
 
         SCHEMA DATABASE:
         {context}
@@ -70,7 +70,8 @@ class ChatBotAI:
         3. Gunakan JOIN yang tepat untuk relasi antar tabel
         4. Untuk agregasi, gunakan GROUP BY yang sesuai
         5. Return HANYA SQL query, tanpa penjelasan tambahan
-        6. Gunakan alias tabel untuk kemudahan baca (u untuk users, p untuk products, o untuk orders, oi untuk order_items)
+        6. Gunakan alias tabel untuk kemudahan baca (contoh: u untuk users, p untuk products, o untuk orders, oi untuk order_items)
+        7. Berikan Query yang terbaik dan pastikan dapat dijalankan ketika mengeksekusi query. Kamu bisa memberikan detail query supaya dapat memberikan informasi lebih kepada user mengenai apa yang dia cari.
 
         CONTOH FORMAT QUERY:
         - SELECT query: SELECT kolom FROM tabel WHERE kondisi;
@@ -98,7 +99,10 @@ class ChatBotAI:
             
             print("SQL Query :", sql_query)
             results = await self.execute_query(conn=conn, sql_query=sql_query)
-            return results
+
+            # Report Agent
+            report = await self.report_agent(question=params.message, result_query=results)
+            return report
     
     async def execute_query(
             self,
@@ -111,3 +115,34 @@ class ChatBotAI:
                 return result.mappings().fetchall()
             except Exception as e:
                 raise e
+            
+    async def report_agent(
+            self,
+            question: str,
+            result_query: list
+    ):
+        prompt_template = """
+        Kamu adalah data analyst yang ahli. Jawab pertanyaan user dengan akurat berdasarkan data yang disediakan.
+
+        PERTANYAAN USER: {question}
+
+        DATA YANG TERSEDIA:
+        - Hasil SQL Query: {result_query}
+
+        INSTRUKSI:
+        1. JAWAB pertanyaan user secara LANGSUNG dan SPESIFIK
+        2. Gunakan data aktual untuk mendukung jawaban
+        3. Berikan insight tambahan yang relevan
+        """
+
+        prompt = PromptTemplate(
+            template=prompt_template,
+            input_variables=["question", "result_query"]
+        )
+        formatted_prompt = prompt.format(question=question, result_query=result_query)
+        report = self.model.invoke(formatted_prompt)
+        return report
+
+
+
+
