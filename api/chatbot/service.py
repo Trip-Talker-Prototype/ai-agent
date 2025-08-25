@@ -120,7 +120,11 @@ class ChatBotAI:
 
                 # Report Agent
                 report = await self.report_agent(question=params.message, result_query=results)
-                return report
+                return MessageDataResponse(
+                    content=report.content,
+                    token_usage=report.response_metadata.get("token_usage", {}),
+                    created_at=datetime.now()
+                )
             
             except ProgrammingError as e:
                 str_error = str(e)
@@ -147,8 +151,11 @@ class ChatBotAI:
                 formatted_prompt = prompt.format(question=params.message, error_message=str_error)
                 report = self.model.invoke(formatted_prompt)
 
-                return report
-                 
+                return MessageDataResponse(
+                    content=report.content,
+                    token_usage=report.response_metadata.get("token_usage", {}),
+                    created_at=datetime.now()
+                )
     
     async def execute_query(
             self,
@@ -188,7 +195,3 @@ class ChatBotAI:
         formatted_prompt = prompt.format(question=question, result_query=result_query)
         report = self.model.invoke(formatted_prompt)
         return report
-
-
-
-

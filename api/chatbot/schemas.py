@@ -25,3 +25,8 @@ class MessageDataResponse(BaseModel):
     token_usage: dict | None = None
     created_at: datetime
     
+class ChatModelResponse(BaseModel):
+    resp: MessageDataResponse
+
+class ChatModelErrorResponse(BaseModel):
+    message: str
