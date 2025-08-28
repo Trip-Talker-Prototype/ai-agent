@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Response, HTTPException
 from fastapi.responses import StreamingResponse
 
-from api.chatbot.service import ChatBotAI
+from api.chatbot.services import ChatBotAI
 from api.chatbot.schemas import APIMessageParams, ChatModelResponse, ChatModelErrorResponse
 from api.database.database import DBConnection
 

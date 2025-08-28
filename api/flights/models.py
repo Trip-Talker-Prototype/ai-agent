@@ -1,4 +1,4 @@
-from sqlalchemy import Table, Column, String, Numeric, Date, UUID
+from sqlalchemy import Table, Column, String, Numeric, Date, UUID, ForeignKey
 from sqlalchemy.sql import func
 
 from api.models.base import get_audit_columns
@@ -18,5 +18,21 @@ flight_price = Table(
     Column("currency", String(3), default='USD'),
     Column("valid_from", Date, nullable=False),
     Column("valid_to", Date, nullable=False),
+    
+    # Kolom baru dengan foreign key
+    Column("origin", String(3), ForeignKey('airports.code'), nullable=False),
+    Column("destination", String(3), ForeignKey('airports.code'), nullable=False),
+    
+    *get_audit_columns()
+)
+
+airports = Table(
+    "airports",
+    metadata,
+    Column("code", String(3), primary_key=True),  # Kode IATA (CGK, DPS, etc)
+    Column("name", String(100), nullable=False),  # Nama bandara
+    Column("city", String(50), nullable=False),   # Kota
+    Column("country", String(50), nullable=False), # Negara
+    Column("timezone", String(50)),               # Timezone
     *get_audit_columns()
 )

@@ -79,23 +79,28 @@ class ChatBotAI:
         valid_to: waktu akhir tersedia atau kadaluarsanya
         created_at: kapan data diubuat
         updated_at: kapan data diubah
+        origin: kode penanda tempat pemberangkatan
+        destination: kode penanda tempat tujuan
+
+        Table: airports 
+        code: kode 3 huruf yang menandakan suatu bandara
+        name: nama bandara
+        city: kota dimana bandara berada
+        country: negara dimana bandara berada
+        timezone: waktu setempat bandara
+        created_at: data dibuat
+        updated_at: data diubah
 
         ATURAN PENTING:
         1. Gunakan HANYA tabel dan kolom yang ada di schema
-        2. Pastikan sintaks PostgreSQL yang benar
+        2. Pastikan sintaks PostgreSQL yang benar  
         3. Gunakan JOIN yang tepat untuk relasi antar tabel
         4. Untuk agregasi, gunakan GROUP BY yang sesuai
-        5. Return HANYA SQL query, tanpa penjelasan tambahan
-        6. Gunakan alias tabel untuk kemudahan baca (contoh: u untuk users, p untuk products, o untuk orders, oi untuk order_items)
+        5. Gunakan alias tabel untuk kemudahan baca (contoh: u untuk users, p untuk products, o untuk orders, oi untuk order_items)
+        6. Return HANYA SQL query tanpa penjelasan tambahan, tanda markdown, atau format lainnya. HANYA berikan SQL query.
         7. Berikan Query yang terbaik dan pastikan dapat dijalankan ketika mengeksekusi query. Kamu bisa memberikan detail query supaya dapat memberikan informasi lebih kepada user mengenai apa yang dia cari.
-
-        CONTOH FORMAT QUERY:
-        - SELECT query: SELECT kolom FROM tabel WHERE kondisi;
-        - JOIN query: SELECT u.name, COUNT(o.order_id) FROM users u LEFT JOIN orders o ON u.user_id = o.user_id GROUP BY u.user_id, u.name;
-
-        PERTANYAAN: {question}
-
-        SQL QUERY:
+        8. HANYA kembalikan SQL query saja tanpa awalan "JAWABAN:" atau teks lainnya
+        9. Langsung kembalikan query SQL tanpa tambahan apapun
         """
 
             prompt = PromptTemplate(
