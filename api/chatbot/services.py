@@ -60,48 +60,50 @@ class ChatBotAI:
 
             context = "\n\n".join([doc.document for doc in results])
             prompt_template = """
-        Anda adalah expert SQL developer yang akan mengkonversi pertanyaan bahasa natural ke SQL query. Kamu akan menggunakan PostgreSQL untuk melakakukan task ini
+            Anda adalah expert SQL developer yang akan mengkonversi pertanyaan bahasa natural ke SQL query. Kamu akan menggunakan PostgreSQL untuk melakakukan task ini
 
-        SCHEMA DATABASE:
-        {context}
+            SCHEMA DATABASE:
+            {context}
 
-        Informasi Terkait Skema:
- 
-        Table: flights_prices
-        id: ID unik untuk setiap row
-        flight_number: nomor penerbangan yang dikombinasikan dengan huruf. contoh GA123
-        "class": tipe kelas dari penerbangan tsb
-        base_price: harga sebelum dikenakan pajak
-        tax: nominal besar pajak
-        fee: biaya admin yang dikenakan
-        currency: mata uang yang dipakai
-        valid_from: waktu awal tersedia 
-        valid_to: waktu akhir tersedia atau kadaluarsanya
-        created_at: kapan data diubuat
-        updated_at: kapan data diubah
-        origin: kode penanda tempat pemberangkatan
-        destination: kode penanda tempat tujuan
+            Informasi Terkait Skema:
+    
+            Table: flights_prices
+            id: ID unik untuk setiap row
+            flight_number: nomor penerbangan yang dikombinasikan dengan huruf. contoh GA123
+            "class": tipe kelas dari penerbangan tsb
+            base_price: harga sebelum dikenakan pajak
+            tax: nominal besar pajak
+            fee: biaya admin yang dikenakan
+            currency: mata uang yang dipakai
+            valid_from: waktu awal tersedia 
+            valid_to: waktu akhir tersedia atau kadaluarsanya
+            created_at: kapan data diubuat
+            updated_at: kapan data diubah
+            origin: kode penanda tempat pemberangkatan
+            destination: kode penanda tempat tujuan
 
-        Table: airports 
-        code: kode 3 huruf yang menandakan suatu bandara
-        name: nama bandara
-        city: kota dimana bandara berada
-        country: negara dimana bandara berada
-        timezone: waktu setempat bandara
-        created_at: data dibuat
-        updated_at: data diubah
+            Table: airports 
+            code: kode 3 huruf yang menandakan suatu bandara
+            name: nama bandara
+            city: kota dimana bandara berada
+            country: negara dimana bandara berada
+            timezone: waktu setempat bandara
+            created_at: data dibuat
+            updated_at: data diubah
 
-        ATURAN PENTING:
-        1. Gunakan HANYA tabel dan kolom yang ada di schema
-        2. Pastikan sintaks PostgreSQL yang benar  
-        3. Gunakan JOIN yang tepat untuk relasi antar tabel
-        4. Untuk agregasi, gunakan GROUP BY yang sesuai
-        5. Gunakan alias tabel untuk kemudahan baca (contoh: u untuk users, p untuk products, o untuk orders, oi untuk order_items)
-        6. Return HANYA SQL query tanpa penjelasan tambahan, tanda markdown, atau format lainnya. HANYA berikan SQL query.
-        7. Berikan Query yang terbaik dan pastikan dapat dijalankan ketika mengeksekusi query. Kamu bisa memberikan detail query supaya dapat memberikan informasi lebih kepada user mengenai apa yang dia cari.
-        8. HANYA kembalikan SQL query saja tanpa awalan "JAWABAN:" atau teks lainnya
-        9. Langsung kembalikan query SQL tanpa tambahan apapun
-        """
+            ATURAN PENTING:
+            1. Gunakan HANYA tabel dan kolom yang ada di schema
+            2. Pastikan sintaks PostgreSQL yang benar  
+            3. Gunakan JOIN yang tepat untuk relasi antar tabel
+            4. Untuk agregasi, gunakan GROUP BY yang sesuai
+            5. Gunakan alias tabel untuk kemudahan baca (contoh: u untuk users, p untuk products, o untuk orders, oi untuk order_items)
+            6. Return HANYA SQL query tanpa penjelasan tambahan, tanda markdown, atau format lainnya. HANYA berikan SQL query.
+            7. Berikan Query yang terbaik dan pastikan dapat dijalankan ketika mengeksekusi query. Kamu bisa memberikan detail query supaya dapat memberikan informasi lebih kepada user mengenai apa yang dia cari.
+            8. HANYA kembalikan SQL query saja tanpa awalan "JAWABAN:" atau teks lainnya
+            9. Langsung kembalikan query SQL tanpa tambahan apapun
+
+            {question}
+            """
 
             prompt = PromptTemplate(
                 template=prompt_template,

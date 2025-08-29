@@ -9,8 +9,11 @@ from datetime import datetime
 
 from typing import Sequence, Union
 
+from api.flights.models import airports
+
 from alembic import op
 import sqlalchemy as sa
+
 
 
 # revision identifiers, used by Alembic.
@@ -38,15 +41,15 @@ def upgrade():
     current_time = datetime.now()
     
     # Step 2: Insert data bandara-bandara umum
-    airports_table = sa.table('airports',
-        sa.column('code', sa.String),
-        sa.column('name', sa.String),
-        sa.column('city', sa.String),
-        sa.column('country', sa.String),
-        sa.column('timezone', sa.String),
-        sa.column('created_at', sa.DateTime),
-        sa.column('updated_at', sa.DateTime)
-    )
+    # airports_table = sa.table('airports',
+    #     sa.column('code', sa.String),
+    #     sa.column('name', sa.String),
+    #     sa.column('city', sa.String),
+    #     sa.column('country', sa.String),
+    #     sa.column('timezone', sa.String),
+    #     sa.column('created_at', sa.DateTime),
+    #     sa.column('updated_at', sa.DateTime)
+    # )
     
     # Data bandara umum di Asia Tenggara
     common_airports = [
@@ -82,7 +85,7 @@ def upgrade():
         }
     ]
     
-    op.bulk_insert(airports_table, common_airports)
+    op.bulk_insert(airports, common_airports)
     
     # Step 3: Tambahkan kolom origin_code dan destination_code sebagai foreign keys
     # op.add_column('flight_prices', sa.Column('origin_code', sa.String(length=3), nullable=True))
@@ -120,17 +123,17 @@ def upgrade():
     op.create_foreign_key(
         'fk_flight_prices_origin_code',
         'flight_prices', 'airports',
-        ['origin'], ['code']
+        ['origin_code'], ['code']
     )
     op.create_foreign_key(
         'fk_flight_prices_destination_code',
         'flight_prices', 'airports',
-        ['destination'], ['code']
+        ['destination_code'], ['code']
     )
     
     # Step 7: Ubah menjadi NOT NULL setelah semua data terisi
-    op.alter_column('flight_prices', 'origin', nullable=False)
-    op.alter_column('flight_prices', 'destination', nullable=False)
+    op.alter_column('flight_prices', 'origin_code', nullable=False)
+    op.alter_column('flight_prices', 'destination_code', nullable=False)
     
     # ### end Alembic commands ###
 
@@ -143,8 +146,8 @@ def downgrade():
     op.drop_constraint('fk_flight_prices_origin_code', 'flight_prices', type_='foreignkey')
     
     # Hapus kolom
-    op.drop_column('flight_prices', 'destination')
-    op.drop_column('flight_prices', 'origin')
+    op.drop_column('flight_prices', 'destination_code')
+    op.drop_column('flight_prices', 'origin_code')
     
     # Hapus table airports
     op.drop_table('airports')
