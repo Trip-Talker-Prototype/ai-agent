@@ -79,8 +79,8 @@ class ChatBotAI:
             valid_to: waktu akhir tersedia atau kadaluarsanya
             created_at: kapan data diubuat
             updated_at: kapan data diubah
-            origin: kode penanda tempat pemberangkatan
-            destination: kode penanda tempat tujuan
+            origin_code: kode penanda tempat pemberangkatan
+            destination_code: kode penanda tempat tujuan
 
             Table: airports 
             code: kode 3 huruf yang menandakan suatu bandara
