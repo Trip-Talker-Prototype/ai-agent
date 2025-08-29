@@ -11,6 +11,8 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
+from api.flights.models import airports
+
 
 # revision identifiers, used by Alembic.
 revision: str = '520c6de34aaa'
@@ -34,16 +36,16 @@ def upgrade() -> None:
 
     current_time = datetime.now()
     
-    # Step 2: Insert data bandara-bandara umum
-    airports_table = sa.table('airports',
-        sa.column('code', sa.String),
-        sa.column('name', sa.String),
-        sa.column('city', sa.String),
-        sa.column('country', sa.String),
-        sa.column('timezone', sa.String),
-        sa.column('created_at', sa.DateTime),
-        sa.column('updated_at', sa.DateTime)
-    )
+    # # Step 2: Insert data bandara-bandara umum
+    # airports_table = sa.table('airports',
+    #     sa.column('code', sa.String),
+    #     sa.column('name', sa.String),
+    #     sa.column('city', sa.String),
+    #     sa.column('country', sa.String),
+    #     sa.column('timezone', sa.String),
+    #     sa.column('created_at', sa.DateTime),
+    #     sa.column('updated_at', sa.DateTime)
+    # )
     
     # Data bandara umum di Asia Tenggara
     common_airports = [
@@ -79,21 +81,21 @@ def upgrade() -> None:
         }
     ]
     
-    op.bulk_insert(airports_table, common_airports)
+    op.bulk_insert(airports, common_airports)
     
     op.create_foreign_key(
         'fk_flight_prices_origin_code',
         'flight_prices', 'airports',
-        ['origin'], ['code']
+        ['origin_code'], ['code']
     )
     op.create_foreign_key(
         'fk_flight_prices_destination_code',
         'flight_prices', 'airports',
-        ['destination'], ['code']
+        ['destination_code'], ['code']
     )
     
-    op.alter_column('flight_prices', 'origin', nullable=False)
-    op.alter_column('flight_prices', 'destination', nullable=False)
+    op.alter_column('flight_prices', 'origin_code', nullable=False)
+    op.alter_column('flight_prices', 'destination_code', nullable=False)
 
 
 def downgrade() -> None:
