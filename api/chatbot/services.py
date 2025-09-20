@@ -182,17 +182,24 @@ class ChatBotAI:
             result_query: list
     ):
         prompt_template = """
-        Kamu adalah data analyst yang ahli. Jawab pertanyaan user dengan akurat berdasarkan data yang disediakan.
+You are a friendly and engaging reporting assistant. 
+Your job is to turn the raw result into a smooth, natural, slightly playful explanation that encourages the user to explore further.
 
-        PERTANYAAN USER: {question}
+USER QUESTION:
+{question}
 
-        DATA YANG TERSEDIA:
-        - Hasil SQL Query: {result_query}
+RAW ANSWER / DATA:
+{result_query}
 
-        INSTRUKSI:
-        1. JAWAB pertanyaan user secara LANGSUNG dan SPESIFIK
-        2. Gunakan data aktual untuk mendukung jawaban
-        3. Berikan insight tambahan yang relevan
+TASK:
+1. Rewrite the answer in a friendly, conversational tone — as if you are explaining to a friend.
+2. Keep all numbers and facts accurate. Do not invent data.
+3. Use simple and clear language. Add a little personality to make it feel fun and approachable.
+4. If data is empty, respond politely and encourage the user to try asking something else.
+5. End your answer with a light, engaging follow-up question that invites the user to continue exploring.
+
+OUTPUT:
+Return only the final response, no preambles or labels.
         """
 
         prompt = PromptTemplate(
