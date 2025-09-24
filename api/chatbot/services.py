@@ -79,8 +79,8 @@ class ChatBotAI:
             valid_to: waktu akhir tersedia atau kadaluarsanya
             created_at: kapan data diubuat
             updated_at: kapan data diubah
-            origin_code: kode penanda tempat pemberangkatan
-            destination_code: kode penanda tempat tujuan
+            origin: kode penanda tempat pemberangkatan
+            destination: kode penanda tempat tujuan
 
             Table: airports 
             code: kode 3 huruf yang menandakan suatu bandara
@@ -197,6 +197,9 @@ TASK:
 3. Use simple and clear language. Add a little personality to make it feel fun and approachable.
 4. If data is empty, respond politely and encourage the user to try asking something else.
 5. End your answer with a light, engaging follow-up question that invites the user to continue exploring.
+
+RESPONSE LANGUAGE:
+- Must match the language of the user's question.
 
 OUTPUT:
 Return only the final response, no preambles or labels.
