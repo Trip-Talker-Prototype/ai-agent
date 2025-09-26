@@ -15,6 +15,8 @@ from api.chatbot.schemas import APIMessageParams, MessageDataResponse
 from api.chatbot.repositories import ChatBotRepositories
 from api.database.client import engine
 
+NOW = datetime.now()
+
 class ChatBotAI:
     def __init__(
             self, 
@@ -60,58 +62,78 @@ class ChatBotAI:
 
             context = "\n\n".join([doc.document for doc in results])
             prompt_template = """
-            Anda adalah expert SQL developer yang akan mengkonversi pertanyaan bahasa natural ke SQL query. Kamu akan menggunakan PostgreSQL untuk melakakukan task ini
+Anda adalah expert SQL developer yang akan mengkonversi pertanyaan bahasa natural ke SQL query. Kamu akan menggunakan PostgreSQL untuk melakakukan task ini
 
-            SCHEMA DATABASE:
-            {context}
+TANGGAL HARI INI: {current_date}
 
-            Informasi Terkait Skema:
-    
-            Table: flights_prices
-            id: ID unik untuk setiap row
-            flight_number: nomor penerbangan yang dikombinasikan dengan huruf. contoh GA123
-            "class": tipe kelas dari penerbangan tsb
-            base_price: harga sebelum dikenakan pajak
-            tax: nominal besar pajak
-            fee: biaya admin yang dikenakan
-            currency: mata uang yang dipakai
-            valid_from: waktu awal tersedia 
-            valid_to: waktu akhir tersedia atau kadaluarsanya
-            created_at: kapan data diubuat
-            updated_at: kapan data diubah
-            origin: kode penanda tempat pemberangkatan
-            destination: kode penanda tempat tujuan
+SCHEMA DATABASE:
+{context}
 
-            Table: airports 
-            code: kode 3 huruf yang menandakan suatu bandara
-            name: nama bandara
-            city: kota dimana bandara berada
-            country: negara dimana bandara berada
-            timezone: waktu setempat bandara
-            created_at: data dibuat
-            updated_at: data diubah
+Informasi Terkait Skema:
 
-            ATURAN PENTING:
-            1. Gunakan HANYA tabel dan kolom yang ada di schema
-            2. Pastikan sintaks PostgreSQL yang benar  
-            3. Gunakan JOIN yang tepat untuk relasi antar tabel
-            4. Untuk agregasi, gunakan GROUP BY yang sesuai
-            5. Gunakan alias tabel untuk kemudahan baca (contoh: u untuk users, p untuk products, o untuk orders, oi untuk order_items)
-            6. Return HANYA SQL query tanpa penjelasan tambahan, tanda markdown, atau format lainnya. HANYA berikan SQL query.
-            7. Berikan Query yang terbaik dan pastikan dapat dijalankan ketika mengeksekusi query. Kamu bisa memberikan detail query supaya dapat memberikan informasi lebih kepada user mengenai apa yang dia cari.
-            8. HANYA kembalikan SQL query saja tanpa awalan "JAWABAN:" atau teks lainnya
-            9. Langsung kembalikan query SQL tanpa tambahan apapun
+Table: flight_prices
+id: ID unik untuk setiap row
+flight_number: nomor penerbangan yang dikombinasikan dengan huruf. contoh GA123
+"class": tipe kelas dari penerbangan tsb
+base_price: harga sebelum dikenakan pajak
+tax: nominal besar pajak
+fee: biaya admin yang dikenakan
+currency: mata uang yang dipakai
+valid_from: waktu awal tersedia 
+valid_to: waktu akhir tersedia atau kadaluarsanya
+created_at: kapan data diubuat
+updated_at: kapan data diubah
+origin_code: kode penanda tempat pemberangkatan
+destination_code: kode penanda tempat tujuan
 
-            {question}
-            """
+Table: airports 
+code: kode 3 huruf yang menandakan suatu bandara
+name: nama bandara
+city: kota dimana bandara berada
+country: negara dimana bandara berada
+timezone: waktu setempat bandara
+created_at: data dibuat
+updated_at: data diubah
+
+ATURAN PENTING:
+1. Gunakan HANYA tabel dan kolom yang ada di schema
+2. Pastikan sintaks PostgreSQL yang benar  
+3. Gunakan JOIN yang tepat untuk relasi antar tabel
+4. Untuk agregasi, gunakan GROUP BY yang sesuai
+5.ketika user bertanya mengenai ketersedian pada tanggal tertentu, gunakan kolom valid_from dengan inputan sesuai dengan jadwal yang diminta user dan valid_to hingga satu bulan kedepan contoh:
+ - untuk informasi waktu saat ini, gunakan tanggal hari ini yaitu {current_date}
+ - jika user menyebutkan tanggal saja, gunakan {current_date} sebagai acuan tahun dan bulan
+ - jika user tidak menyebutkan tanggal, berikan informasi tiket yang valid_from lebih besar atau sama dengan {current_date}
+6. Gunakan alias tabel untuk kemudahan baca (contoh: u untuk users, p untuk products, o untuk orders, oi untuk order_items)
+7. Return HANYA SQL query tanpa penjelasan tambahan, tanda markdown, atau format lainnya. HANYA berikan SQL query.
+8. Berikan Query yang terbaik dan pastikan dapat dijalankan ketika mengeksekusi query. Kamu bisa memberikan detail query supaya dapat memberikan informasi lebih kepada user mengenai apa yang dia cari.
+9. HANYA kembalikan SQL query saja tanpa awalan "JAWABAN:" atau teks lainnya
+10. Langsung kembalikan query SQL tanpa tambahan apapun
+
+CONTOH QUESTION dan SQL QUERY:
+question: Tampilkan semua TIKET
+answer: SELECT * FROM flight_prices;
+
+question: Tampilkan tiket dari CGK ke DPS
+answer: SELECT fp.flight_number, fp.class, fp.base_price, fp.tax, fp.fee, fp.currency, fp.valid_from, fp.valid_to, fp.origin_code, fp.destination_code, a1.name AS origin_name, a2.name AS destination_name FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE fp.origin_code = 'CGK' AND fp.destination_code = 'DPS';
+
+question: Apakah ada jadwal pesawat dari CGK ke DPS pada tanggal 7 Agustus?
+answer: SELECT fp.flight_number, fp.class, fp.base_price, fp.tax, fp.fee, fp.currency, fp.valid_from, fp.valid_to, fp.origin_code, fp.destination_code, a1.name AS origin_name, a2.name AS destination_name FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE fp.origin_code = 'CGK' AND fp.destination_code = 'DPS' AND fp.valid_from >= '2025-08-07' AND valid_to <= '2025-09-07';
+
+question: Apakah ada jadwal pesawat dari Jakarta ke Bali pada tanggal 7 Agustus?
+answer: SELECT fp.flight_number, fp.class, fp.base_price, fp.tax, fp.fee, fp.currency, fp.valid_from, fp.valid_to, fp.origin_code, fp.destination_code, a1.name AS origin_name, a2.name AS destination_name FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE a1.city = 'Jakarta' AND a2.city = 'Denpasar' AND fp.valid_from >= '2025-08-07' AND valid_to <= '2025-09-07';
+
+question: {question}
+answer:
+"""
 
             prompt = PromptTemplate(
                 template=prompt_template,
-                input_variables=["context", "question"]
+                input_variables=["context", "question", "current_date"]
             )
             
             # Generate SQL using LLM
-            formatted_prompt = prompt.format(context=context, question=params.message)
+            formatted_prompt = prompt.format(context=context, question=params.message, current_date=NOW.strftime("%Y-%m-%d"))
             sql_query = self.llm(formatted_prompt).strip()
             
             # Clean up the response
@@ -137,18 +159,18 @@ class ChatBotAI:
                 str_error = str(e)
 
                 prompt_template = """
-                Kamu adalah data analyst yang ahli yang dimana kamu bekerja untuk suatu pelayanan penerbangan. Kamu akan diberikan suatu error log dan pertanyaan dari user.
-                Berikan informasi kepada user mengapa kesalahan dapat terjadi. Bisa jadi user bertanya diluar batas pengetahuanmu.
+Kamu adalah data analyst yang ahli yang dimana kamu bekerja untuk suatu pelayanan penerbangan. Kamu akan diberikan suatu error log dan pertanyaan dari user.
+Berikan informasi kepada user mengapa kesalahan dapat terjadi. Bisa jadi user bertanya diluar batas pengetahuanmu.
 
-                contoh:
-                question: siapa presiden singapura
-                answer: maaf kami tidak mengetahui jawaban mengenai permintaan anda. silahkan bertanya seputar tiket dan penerbangan yang kamu mau tahu ya.
+contoh:
+question: siapa presiden singapura
+answer: maaf kami tidak mengetahui jawaban mengenai permintaan anda. silahkan bertanya seputar tiket dan penerbangan yang kamu mau tahu ya.
 
-                INSTRUKSI:
-                1. JAWAB pertanyaan user secara LANGSUNG. Kamu boleh memodifikasi jawaban dengan lebih natural dan enak dibaca oleh user
+INSTRUKSI:
+1. JAWAB pertanyaan user secara LANGSUNG. Kamu boleh memodifikasi jawaban dengan lebih natural dan enak dibaca oleh user
 
-                question: {question}
-                error message: {error_message}
+question: {question}
+error message: {error_message}
                 """
 
                 prompt = PromptTemplate(
@@ -203,7 +225,7 @@ RESPONSE LANGUAGE:
 
 OUTPUT:
 Return only the final response, no preambles or labels.
-        """
+"""
 
         prompt = PromptTemplate(
             template=prompt_template,
