@@ -33,6 +33,29 @@ class ChatBotAI:
             stream_usage=True,
         )
 
+    async def language_detection(self) -> str:
+        prompt_template = """
+You are a language detection model. Your task is to identify the language of the given text.
+
+Identify the language of the following text and respond with the language name only (e.g., English, Spanish, French, etc.):
+
+Text: Halo siapa nama kamu?
+Answer: Indonesian
+
+Text: Hello What is your name?
+Answer: English
+
+Text: {text}
+"""
+        prompt = PromptTemplate(
+            template=prompt_template,
+            input_variables=["text"]
+        )
+        formatted_prompt = prompt.format(text=self.params.message)
+        response = self.model.invoke(formatted_prompt)
+
+        return response.content.strip()
+
     async def create_conversation(
             self,
             conn: AsyncConnection,
@@ -170,10 +193,14 @@ answer:
         print("SQL Query :", sql_query)
 
         try:
+            # Execute SQL query
             results = await self.execute_query(conn=conn, sql_query=sql_query)
 
+            # Language Detection
+            language = await self.language_detection()
+
             # Report Agent
-            report = await self.report_agent(question=self.params.message, result_query=results)
+            report = await self.report_agent(question=self.params.message, result_query=results, language=language)
 
             
             ## create message from bot
@@ -251,6 +278,7 @@ error message: {error_message}
     async def report_agent(
             self,
             question: str,
+            language: str,
             result_query: list
     ):
         prompt_template = """
@@ -271,7 +299,7 @@ TASK:
 5. End your answer with a light, engaging follow-up question that invites the user to continue exploring.
 
 RESPONSE LANGUAGE:
-- Must match the language of the user's question.
+- {language}
 
 OUTPUT:
 Return only the final response, no preambles or labels.
@@ -279,8 +307,8 @@ Return only the final response, no preambles or labels.
 
         prompt = PromptTemplate(
             template=prompt_template,
-            input_variables=["question", "result_query"]
+            input_variables=["question", "result_query", "language"]
         )
-        formatted_prompt = prompt.format(question=question, result_query=result_query)
+        formatted_prompt = prompt.format(question=question, result_query=result_query, language=language)
         report = self.model.invoke(formatted_prompt)
         return report
