@@ -14,9 +14,9 @@ async def chat_v2(
     db: DBConnection,
     params: APIMessageParams
 ):
-    payload = await ChatBotAI(params=params).create_conversation(conn=db)
     try:
-        chat = await ChatBotAI(params=params).chat_v2(conn=db, params=params)
+        chat = await ChatBotAI(params=params).create_conversation(conn=db)
+        import pdb;pdb.set_trace()
         return ChatModelResponse(resp=chat)
     except HTTPException as ex:
         response.status_code = ex.status_code
