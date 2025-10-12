@@ -16,7 +16,6 @@ async def chat_v2(
 ):
     try:
         chat = await ChatBotAI(params=params).create_conversation(conn=db)
-        import pdb;pdb.set_trace()
         return ChatModelResponse(resp=chat)
     except HTTPException as ex:
         response.status_code = ex.status_code
