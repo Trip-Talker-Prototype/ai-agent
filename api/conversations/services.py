@@ -174,6 +174,8 @@ answer:
 
             # Report Agent
             report = await self.report_agent(question=self.params.message, result_query=results)
+
+            
             ## create message from bot
             message_payload = CreateMessageRequest(
                 conversation_id=conversation_id,
@@ -185,11 +187,13 @@ answer:
             ).transform()
             await MessageRepository().create_message(conn=conn, payload=message_payload)
 
-            return MessageDataResponse(
-                content=report.content,
-                token_usage=report.response_metadata.get("token_usage", {}),
-                created_at=datetime.now()
-            )
+            # return MessageDataResponse(
+            #     content=report.content,
+            #     token_usage=report.response_metadata.get("token_usage", {}),
+            #     created_at=datetime.now()
+            # )
+
+            return MessageDataResponse(content=report.content,token_usage=report.response_metadata.get("token_usage", {}),created_at=datetime.now())
         
         except ProgrammingError as e:
             str_error = str(e)
