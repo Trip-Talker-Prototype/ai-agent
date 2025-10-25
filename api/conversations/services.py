@@ -2,15 +2,17 @@ from datetime import datetime
 
 from api.conversations.models import conversation, message, MessageTypeEnum
 from api.conversations.schemas import APIMessageParams, CreateConversationRequest, CreateMessageRequest, MessageDataResponse, ChatModelResponse
-from api.conversations.repositories import ConversationRepository, MessageRepository
+from api.conversations.repositories import ConversationRepository, MessageRepository, InMemoryChatMessageHistory
 from api.conversations.entities import ConversationEntities, MessageEntities
 from api.chatbot.repositories import ChatBotRepositories
 
 from langchain_openai import OpenAIEmbeddings
 from langchain.chat_models import init_chat_model
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableWithMessageHistory
 from langchain_community.llms import OpenAI
-from langchain.prompts import PromptTemplate
+from langchain.prompts import PromptTemplate, MessagesPlaceholder
+from langchain.schema import AIMessage, HumanMessage, StrOutputParser
 
 from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -32,6 +34,7 @@ class ChatBotAI:
             model="gpt-4o-mini",
             stream_usage=True,
         )
+        self.conversation_id = ""
 
     async def language_detection(self) -> str:
         prompt_template = """
@@ -68,7 +71,7 @@ Text: {text}
             await ConversationRepository().create_conversation(conn=conn, payload=payload)
             
             
-            conversation_id = payload.id
+            self.conversation_id = payload.id
             created_by = payload.created_by
         else:
             data = await ConversationRepository().get_conversation_by_id(
@@ -77,6 +80,8 @@ Text: {text}
             )
             if data.get("id", None):
                 # get conversation_id and created_by
+
+                self.conversation_id = self.params.conversation_id
                 conversation_id = data.get("id", "")
                 created_by = data.get("created_by", "")
             else:
@@ -87,11 +92,13 @@ Text: {text}
                 ).transform()
                 await self.__conversation_repo.create_conversation(conn=conn, payload=payload)
 
+                self.conversation_id = self.params.conversation_id
                 conversation_id = payload.id
                 created_by = payload.created_by
+        
         # create message from user
         message_payload = CreateMessageRequest(
-            conversation_id=conversation_id,
+            conversation_id=self.conversation_id,
             content=self.params.message,
             message_type=MessageTypeEnum.question,
             token_usage={},
@@ -195,24 +202,27 @@ answer:
         try:
             # Execute SQL query
             results = await self.execute_query(conn=conn, sql_query=sql_query)
+            print("Success executing SQL")
 
             # Language Detection
             language = await self.language_detection()
+            print("Success collect Language")
 
             # Report Agent
-            report = await self.report_agent(question=self.params.message, result_query=results, language=language)
+            report = await self.report_agent(question=self.params.message, result_query=results, language=language, conn=conn)
+            print(f"REPORT: {report}")
 
             
             ## create message from bot
-            message_payload = CreateMessageRequest(
-                conversation_id=conversation_id,
-                content=report.content,
-                message_type=MessageTypeEnum.answer,
-                token_usage=report.response_metadata.get("token_usage", {}),
-                created_by=created_by,
-                metadata={}
-            ).transform()
-            await MessageRepository().create_message(conn=conn, payload=message_payload)
+            # message_payload = CreateMessageRequest(
+            #     conversation_id=conversation_id,
+            #     content=report.content,
+            #     message_type=MessageTypeEnum.answer,
+            #     token_usage=report.response_metadata.get("token_usage", {}),
+            #     created_by=created_by,
+            #     metadata={}
+            # ).transform()
+            # await MessageRepository().create_message(conn=conn, payload=message_payload)
 
             # return MessageDataResponse(
             #     content=report.content,
@@ -220,7 +230,8 @@ answer:
             #     created_at=datetime.now()
             # )
 
-            return MessageDataResponse(content=report.content,token_usage=report.response_metadata.get("token_usage", {}),created_at=datetime.now())
+            # return MessageDataResponse(content=report.content,token_usage=report.response_metadata.get("token_usage", {}),created_at=datetime.now())
+            return report
         
         except ProgrammingError as e:
             str_error = str(e)
@@ -279,6 +290,7 @@ error message: {error_message}
             self,
             question: str,
             language: str,
+            conn: AsyncConnection,
             result_query: list
     ):
         prompt_template = """
@@ -305,10 +317,53 @@ OUTPUT:
 Return only the final response, no preambles or labels.
 """
 
-        prompt = PromptTemplate(
-            template=prompt_template,
-            input_variables=["question", "result_query", "language"]
+        # === ✅ Buat instance history di luar agar bisa di-load dulu ===
+        history = InMemoryChatMessageHistory(
+            conn=conn, 
+            conversation_id=self.params.conversation_id
         )
-        formatted_prompt = prompt.format(question=question, result_query=result_query, language=language)
-        report = self.model.invoke(formatted_prompt)
-        return report
+        print("Success Get History")
+        
+        # === ✅ Load messages ke cache sebelum invoke ===
+        await history.aget_messages()
+        print("Success Load Message History")
+
+        def get_session_history(session_id: str):
+            """Harus return instance yang sama"""
+            return history
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system",prompt_template),
+            MessagesPlaceholder(variable_name="history"),
+            ("human","{question}")
+        ])
+
+        chain = prompt | self.llm | StrOutputParser()
+
+        chain_with_history = RunnableWithMessageHistory(
+            chain,
+            get_session_history=get_session_history,
+            input_messages_key="question",
+            history_messages_key="history",
+        )
+
+        # 💾 Simpan pertanyaan user
+        # await history.aadd_message(HumanMessage(content=self.params.message))
+
+        response = await chain_with_history.ainvoke(
+            {
+                "question": question,
+                "result_query": result_query,
+                "language": language
+            },
+            config={"configurable": {"session_id": self.params.conversation_id}}
+        )
+
+        # 💾 Simpan response AI
+        await history.aadd_message(AIMessage(content=response), conversation_id=self.conversation_id)
+
+        return MessageDataResponse(
+            content=response,
+            token_usage={},
+            created_at=datetime.now()
+        )

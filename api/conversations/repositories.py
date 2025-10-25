@@ -1,11 +1,15 @@
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain.schema import AIMessage, HumanMessage, BaseMessage
+
 from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncConnection
-from sqlalchemy import RowMapping, select, func, cast, insert, desc, String
+from sqlalchemy import RowMapping, select, func, cast, insert, desc, String, delete
 from sqlalchemy.sql.operators import eq
 
 from api.conversations.interface import ConversationInterFace, MessageInterFace
 from api.conversations.models import conversation, message, MessageTypeEnum
 from api.conversations.entities import ConversationEntities, MessageEntities
+from api.conversations.schemas import APIMessageParams, CreateConversationRequest, CreateMessageRequest, MessageDataResponse, ChatModelResponse
 
 class ConversationRepository(ConversationInterFace):
     async def create_conversation(self, conn: AsyncConnection, payload: ConversationEntities):
@@ -69,3 +73,95 @@ class MessageRepository(MessageInterFace):
         except Exception as e:
             raise e
         return payload
+    
+    async def delete_message(self, conn: AsyncConnection, payload: MessageEntities):
+        stmt = delete(message).where(eq(message.c.id, payload.id))
+        try:
+            await conn.execute(statement=stmt)
+            await conn.commit()
+        except Exception as e:
+            raise e
+        return payload
+
+
+class InMemoryChatMessageHistory(BaseChatMessageHistory):
+    def __init__(self, conn, conversation_id: str):
+        self.conn = conn
+        self.conversation_id = conversation_id
+        self._messages_cache = []
+
+    @property
+    def messages(self):
+        """
+        Langchain membutuhkan property sinkron ini.
+        Karena kita di context async, kita return cache atau empty list.
+        """
+        return self._messages_cache
+
+    async def aget_messages(self):
+        """Load messages dari DB"""
+
+        if self.conversation_id != '':
+            # ✅ Selalu load fresh dari DB
+            data = await ConversationRepository().get_conversation_by_id(
+                conn=self.conn,
+                payload=ConversationEntities(id=self.conversation_id)
+            )
+
+            msgs = []
+            for r in data.get("messages", []):
+                if r["message_type"] == "question":
+                    msgs.append(HumanMessage(content=r["content"]))
+                else:
+                    msgs.append(AIMessage(content=r["content"]))
+            
+            self._messages_cache = msgs
+            self._loaded = True
+            
+            print(f"📜 Loaded {len(msgs)} messages for conversation {self.conversation_id}")  # ✅ Debug
+            return msgs
+        else:
+            print(f"📜 New conversation detection")  # ✅ Debug
+            return []
+
+    async def aadd_message(self, message: BaseMessage, conversation_id: str | None = None):
+        if isinstance(message, HumanMessage):
+            message_type = MessageTypeEnum.question
+        else:
+            message_type = MessageTypeEnum.answer
+        
+        print(f"💾 Saving message: {message_type.value} - {message.content[:50]}...")  # ✅ Debug
+
+        await MessageRepository().create_message(
+            conn=self.conn,
+            payload=CreateMessageRequest(
+                conversation_id=conversation_id,
+                content=message.content,
+                message_type=message_type,
+                token_usage={},
+                created_by="system",
+                metadata={}
+            ).transform()
+        )
+        
+        # ✅ Update cache juga
+        if self._messages_cache is not None:
+            self._messages_cache.append(message)
+
+    # === ✅ Method sinkron untuk add (fallback) ===
+    def add_message(self, message: BaseMessage):
+        """Fallback sinkron jika diperlukan"""
+        self._messages_cache.append(message)
+
+    # === ✅ Method async untuk clear ===
+    async def aclear(self):
+        await MessageRepository().delete_message(
+            conn=self.conn,
+            payload=MessageEntities(conversation_id=self.conversation_id)
+        )
+        self._messages_cache = []
+
+    # === ✅ Method sinkron untuk clear (fallback) ===
+    def clear(self):
+        """Fallback sinkron jika diperlukan"""
+        self._messages_cache = []
