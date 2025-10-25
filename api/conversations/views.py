@@ -25,26 +25,5 @@ async def chat_v2(
     except Exception as ex:
         response.status_code = 500
         return ChatModelErrorResponse(
-            message="Failed asking the model"
-        )
-    
-@conversation_router.post("/stream")
-async def test_language(
-    request: Request,
-    response:Response,
-    db: DBConnection,
-    params: APIMessageParams
-):
-    try:
-        chat = await ChatBotAI(params=params).language_detection()
-        return StreamingResponse(chat, media_type="text/event-stream")
-    except HTTPException as ex:
-        response.status_code = ex.status_code
-        return ChatModelErrorResponse(
-            message=ex.detail
-        )
-    except Exception as ex:
-        response.status_code = 500
-        return ChatModelErrorResponse(
-            message="Failed asking the model"
+            message=str("Failed asking the model.\n" + str(ex))
         )
