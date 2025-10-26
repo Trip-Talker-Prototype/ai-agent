@@ -3,7 +3,6 @@ import logging
 from langchain_community.llms import OpenAI
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import PGVector
-from langchain.memory import ConversationBufferMemory
 from langchain.schema import Document
 
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -22,7 +21,6 @@ class FlightServices:
         
         self.embeddings = OpenAIEmbeddings()
         self.llm = OpenAI(temperature = 0)
-        self.memory = ConversationBufferMemory(return_messages=True)
 
     async def get_flights(
             self,
