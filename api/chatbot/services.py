@@ -2,9 +2,8 @@ from datetime import datetime
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain.chat_models import init_chat_model
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_community.embeddings import OpenAIEmbeddings
-from langchain.prompts import PromptTemplate
 from langchain_community.llms import OpenAI
 
 from sqlalchemy.ext.asyncio import AsyncConnection
