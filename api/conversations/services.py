@@ -6,11 +6,10 @@ from api.conversations.repositories import ConversationRepository, MessageReposi
 from api.conversations.entities import ConversationEntities, MessageEntities
 from api.chatbot.repositories import ChatBotRepositories
 
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings, OpenAI
 from langchain.chat_models import init_chat_model
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableWithMessageHistory
-from langchain_community.llms import OpenAI
 from langchain_core.messages import AIMessage
 from langchain_core.output_parsers import StrOutputParser
 
