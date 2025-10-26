@@ -1,5 +1,5 @@
 from langchain_core.chat_history import BaseChatMessageHistory
-from langchain.schema import AIMessage, HumanMessage, BaseMessage
+from langchain_core.messages import AIMessage, HumanMessage, BaseMessage
 
 from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncConnection

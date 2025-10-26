@@ -11,7 +11,8 @@ from langchain.chat_models import init_chat_model
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableWithMessageHistory
 from langchain_community.llms import OpenAI
-from langchain.schema import AIMessage, HumanMessage, StrOutputParser
+from langchain_core.messages import AIMessage
+from langchain_core.output_parsers import StrOutputParser
 
 from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncConnection
