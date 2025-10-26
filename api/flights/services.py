@@ -3,7 +3,7 @@ import logging
 from langchain_community.llms import OpenAI
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import PGVector
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from sqlalchemy.ext.asyncio import AsyncConnection
 
