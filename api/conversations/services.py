@@ -6,7 +6,7 @@ from api.conversations.repositories import ConversationRepository, MessageReposi
 from api.conversations.entities import ConversationEntities, MessageEntities
 from api.chatbot.repositories import ChatBotRepositories
 
-from langchain_openai import OpenAIEmbeddings, OpenAI
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chat_models import init_chat_model
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableWithMessageHistory
@@ -28,7 +28,7 @@ class ChatBotAI:
             params: APIMessageParams,
         ):
         self.params = params
-        self.llm = OpenAI(temperature = 0)
+        self.llm = ChatOpenAI(temperature = 0)
         self.model = init_chat_model(
             model="gpt-4o-mini",
             stream_usage=True,
