@@ -6,7 +6,7 @@ from api.conversations.repositories import ConversationRepository, MessageReposi
 from api.conversations.entities import ConversationEntities, MessageEntities
 from api.chatbot.repositories import ChatBotRepositories
 
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_openai import OpenAIEmbeddings, OpenAI
 from langchain.chat_models import init_chat_model
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableWithMessageHistory
@@ -28,7 +28,7 @@ class ChatBotAI:
             params: APIMessageParams,
         ):
         self.params = params
-        self.llm = ChatOpenAI(temperature = 0)
+        self.llm = OpenAI(temperature = 0)
         self.model = init_chat_model(
             model="gpt-4o-mini",
             stream_usage=True,
@@ -57,6 +57,61 @@ Text: {text}
         response = self.model.invoke(formatted_prompt)
 
         return response.content.strip()
+
+    async def clean_sql(self, sql_output: str):
+        sql_output = sql_output.replace("\\n", "\n").replace("\\t", "\t")
+    
+        # Remove common prefixes (case insensitive)
+        prefixes_to_remove = [
+            "answer:", "sql:", "query:", "result:", 
+            "here is the sql:", "the query is:",
+            "```sql", "```", "A:", "AI:", "System:"
+        ]
+        
+        sql_lower = sql_output.lower().strip()
+        for prefix in prefixes_to_remove:
+            if sql_lower.startswith(prefix):
+                sql_output = sql_output[len(prefix):].strip()
+                sql_lower = sql_output.lower().strip()
+        
+        # Remove trailing markdown
+        if sql_output.endswith("```"):
+            sql_output = sql_output[:-3].strip()
+        
+        # Remove multiple newlines at start
+        sql_output = sql_output.lstrip("\n").strip()
+        
+        # Ensure it starts with a SQL keyword
+        sql_keywords = ["SELECT", "INSERT", "UPDATE", "DELETE", "WITH"]
+        if not any(sql_output.upper().startswith(kw) for kw in sql_keywords):
+            # Try to find the SQL part
+            for keyword in sql_keywords:
+                if keyword in sql_output.upper():
+                    idx = sql_output.upper().index(keyword)
+                    sql_output = sql_output[idx:].strip()
+                    break
+        
+        return sql_output
+
+    def validate_sql_output(self, sql: str) -> bool:
+        """Validasi apakah output benar-benar SQL query"""
+        
+        sql_upper = sql.upper().strip()
+        
+        # Must start with SQL keyword
+        valid_keywords = ["SELECT", "INSERT", "UPDATE", "DELETE", "WITH"]
+        if not any(sql_upper.startswith(kw) for kw in valid_keywords):
+            print(f"❌ Invalid SQL: doesn't start with SQL keyword")
+            return False
+        
+        # Should not contain conversational words
+        conversational_words = ["AI:", "ASSISTANT:", "JAWABAN:", "TIKET PALING MAHAL ADALAH"]
+        for word in conversational_words:
+            if word in sql_upper:
+                print(f"❌ Invalid SQL: contains conversational text '{word}'")
+                return False
+        
+        return True
 
     async def create_conversation(
             self,
@@ -115,16 +170,78 @@ Text: {text}
             message=query_embeddings
         )
         context = "\n\n".join([doc.document for doc in results])
-        prompt_template = """
-Anda adalah expert SQL developer yang akan mengkonversi pertanyaan bahasa natural ke SQL query. Kamu akan menggunakan PostgreSQL untuk melakakukan task ini
+#         prompt_template = """
+# Anda adalah expert SQL developer yang akan mengkonversi pertanyaan bahasa natural ke SQL query. Kamu akan menggunakan PostgreSQL untuk melakakukan task ini
+
+# TANGGAL HARI INI: {current_date}
+
+# SCHEMA DATABASE:
+# {context}
+
+# Informasi Terkait Skema:
+
+# Table: flight_prices
+# id: ID unik untuk setiap row
+# flight_number: nomor penerbangan yang dikombinasikan dengan huruf. contoh GA123
+# "class": tipe kelas dari penerbangan tsb
+# base_price: harga sebelum dikenakan pajak
+# tax: nominal besar pajak
+# fee: biaya admin yang dikenakan
+# currency: mata uang yang dipakai
+# valid_from: waktu awal tersedia 
+# valid_to: waktu akhir tersedia atau kadaluarsanya
+# created_at: kapan data diubuat
+# updated_at: kapan data diubah
+# origin_code: kode penanda tempat pemberangkatan
+# destination_code: kode penanda tempat tujuan
+
+# Table: airports 
+# code: kode 3 huruf yang menandakan suatu bandara
+# name: nama bandara
+# city: kota dimana bandara berada
+# country: negara dimana bandara berada
+# timezone: waktu setempat bandara
+# created_at: data dibuat
+# updated_at: data diubah
+
+# ATURAN PENTING:
+# 1. Gunakan HANYA tabel dan kolom yang ada di schema
+# 2. Pastikan sintaks PostgreSQL yang benar  
+# 3. Gunakan JOIN yang tepat untuk relasi antar tabel
+# 4. Untuk agregasi, gunakan GROUP BY yang sesuai
+# 5.ketika user bertanya mengenai ketersedian pada tanggal tertentu, gunakan kolom valid_from dengan inputan sesuai dengan jadwal yang diminta user dan valid_to hingga satu bulan kedepan contoh:
+# - untuk informasi waktu saat ini, gunakan tanggal hari ini yaitu {current_date}
+# - jika user menyebutkan tanggal saja, gunakan {current_date} sebagai acuan tahun dan bulan
+# - jika user tidak menyebutkan tanggal, berikan informasi tiket yang valid_from lebih besar atau sama dengan {current_date}
+# 6. Gunakan alias tabel untuk kemudahan baca (contoh: u untuk users, p untuk products, o untuk orders, oi untuk order_items)
+# 7. Return HANYA SQL query tanpa penjelasan tambahan, tanda markdown, tanpa awalan "JAWABAN:", "answer:", "query:", "sql:", etc. HANYA BERIKAN RAW QUERY.
+# 8. Berikan Query yang terbaik dan pastikan dapat dijalankan ketika mengeksekusi query. Kamu bisa memberikan detail query supaya dapat memberikan informasi lebih kepada user mengenai apa yang dia cari.
+
+# EXAMPLES:
+# Q: Tampilkan semua TIKET
+# A: SELECT * FROM flight_prices;
+
+# Q: Tampilkan tiket dari CGK ke DPS
+# A: SELECT fp.flight_number, fp.class, fp.base_price, fp.tax, fp.fee, fp.currency, fp.valid_from, fp.valid_to, fp.origin_code, fp.destination_code, a1.name AS origin_name, a2.name AS destination_name FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE fp.origin_code = 'CGK' AND fp.destination_code = 'DPS';
+
+# Q: Apakah ada jadwal pesawat dari CGK ke DPS pada tanggal 7 Agustus?
+# A: SELECT fp.flight_number, fp.class, fp.base_price, fp.tax, fp.fee, fp.currency, fp.valid_from, fp.valid_to, fp.origin_code, fp.destination_code, a1.name AS origin_name, a2.name AS destination_name FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE fp.origin_code = 'CGK' AND fp.destination_code = 'DPS' AND fp.valid_from >= '2025-08-07' AND valid_to <= '2025-09-07';
+
+# Q: Apakah ada jadwal pesawat dari Jakarta ke Bali pada tanggal 7 Agustus?
+# A: SELECT fp.flight_number, fp.class, fp.base_price, fp.tax, fp.fee, fp.currency, fp.valid_from, fp.valid_to, fp.origin_code, fp.destination_code, a1.name AS origin_name, a2.name AS destination_name FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE a1.city = 'Jakarta' AND a2.city = 'Denpasar' AND fp.valid_from >= '2025-08-07' AND valid_to <= '2025-09-07';
+
+# Now generate SQL for the user's question below.
+# """
+
+        understanding_prompt = """
+Kamu adalah SQL analyst assistant. Tugasmu adalah memahami pertanyaan user dan context sebelumnya.
 
 TANGGAL HARI INI: {current_date}
 
-SCHEMA DATABASE:
+DATABASE SCHEMA:
 {context}
 
-Informasi Terkait Skema:
-
+INFORMASI TABEL:
 Table: flight_prices
 id: ID unik untuk setiap row
 flight_number: nomor penerbangan yang dikombinasikan dengan huruf. contoh GA123
@@ -149,58 +266,127 @@ timezone: waktu setempat bandara
 created_at: data dibuat
 updated_at: data diubah
 
-ATURAN PENTING:
-1. Gunakan HANYA tabel dan kolom yang ada di schema
-2. Pastikan sintaks PostgreSQL yang benar  
-3. Gunakan JOIN yang tepat untuk relasi antar tabel
-4. Untuk agregasi, gunakan GROUP BY yang sesuai
-5.ketika user bertanya mengenai ketersedian pada tanggal tertentu, gunakan kolom valid_from dengan inputan sesuai dengan jadwal yang diminta user dan valid_to hingga satu bulan kedepan contoh:
-- untuk informasi waktu saat ini, gunakan tanggal hari ini yaitu {current_date}
-- jika user menyebutkan tanggal saja, gunakan {current_date} sebagai acuan tahun dan bulan
-- jika user tidak menyebutkan tanggal, berikan informasi tiket yang valid_from lebih besar atau sama dengan {current_date}
-6. Gunakan alias tabel untuk kemudahan baca (contoh: u untuk users, p untuk products, o untuk orders, oi untuk order_items)
-7. Return HANYA SQL query tanpa penjelasan tambahan, tanda markdown, atau format lainnya. HANYA berikan SQL query.
-8. Berikan Query yang terbaik dan pastikan dapat dijalankan ketika mengeksekusi query. Kamu bisa memberikan detail query supaya dapat memberikan informasi lebih kepada user mengenai apa yang dia cari.
-9. HANYA kembalikan SQL query saja tanpa awalan "JAWABAN:" atau teks lainnya
-10. Langsung kembalikan query SQL tanpa tambahan apapun
+Tugasmu:
+1. Jika user bertanya follow-up (seperti "yang paling murah?", "berapa harganya?"), identifikasi apa yang dimaksud dari percakapan sebelumnya
+2. Reformulasi pertanyaan menjadi pertanyaan lengkap yang bisa dijawab dengan SQL
+3. Output harus dalam format: "QUERY_INTENT: [penjelasan singkat apa yang harus di-query]"
 
-CONTOH QUESTION dan SQL QUERY:
-question: Tampilkan semua TIKET
-answer: SELECT * FROM flight_prices;
-
-question: Tampilkan tiket dari CGK ke DPS
-answer: SELECT fp.flight_number, fp.class, fp.base_price, fp.tax, fp.fee, fp.currency, fp.valid_from, fp.valid_to, fp.origin_code, fp.destination_code, a1.name AS origin_name, a2.name AS destination_name FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE fp.origin_code = 'CGK' AND fp.destination_code = 'DPS';
-
-question: Apakah ada jadwal pesawat dari CGK ke DPS pada tanggal 7 Agustus?
-answer: SELECT fp.flight_number, fp.class, fp.base_price, fp.tax, fp.fee, fp.currency, fp.valid_from, fp.valid_to, fp.origin_code, fp.destination_code, a1.name AS origin_name, a2.name AS destination_name FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE fp.origin_code = 'CGK' AND fp.destination_code = 'DPS' AND fp.valid_from >= '2025-08-07' AND valid_to <= '2025-09-07';
-
-question: Apakah ada jadwal pesawat dari Jakarta ke Bali pada tanggal 7 Agustus?
-answer: SELECT fp.flight_number, fp.class, fp.base_price, fp.tax, fp.fee, fp.currency, fp.valid_from, fp.valid_to, fp.origin_code, fp.destination_code, a1.name AS origin_name, a2.name AS destination_name FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE a1.city = 'Jakarta' AND a2.city = 'Denpasar' AND fp.valid_from >= '2025-08-07' AND valid_to <= '2025-09-07';
-
-question: {question}
-answer:
+Contoh:
+User sebelumnya tanya: "Ada penerbangan Jakarta-Bali tanggal 7 Agustus?"
+User sekarang tanya: "Yang paling murah?"
+Output: "QUERY_INTENT: Cari penerbangan Jakarta-Bali tanggal 7 Agustus dengan harga paling murah"
 """
 
-        prompt = PromptTemplate(
-            template=prompt_template,
-            input_variables=["context", "question", "current_date"]
+        sql_prompt = """
+Kamu adalah expert SQL generator. Generate ONLY valid PostgreSQL query.
+
+DATABASE SCHEMA:
+{context}
+
+ATURAN KRITIS:
+1. Return HANYA SQL query
+2. Mulai langsung dengan SELECT
+3. TIDAK BOLEH ada teks lain, prefix, atau penjelasan
+4. TIDAK BOLEH ada "AI:", "answer:", "jawaban:", atau apapun
+5. TIDAK BOLEH ada markdown atau code blocks
+
+EXAMPLES:
+Intent: Cari semua penerbangan
+Output: SELECT * FROM flight_prices;
+
+Intent: Cari penerbangan Jakarta-Bali tanggal 7 Agustus
+Output: SELECT fp.* FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE a1.city = 'Jakarta' AND a2.city = 'Denpasar' AND fp.valid_from >= '2025-08-07' AND valid_to <= '2025-09-07';
+
+Intent: Cari penerbangan Jakarta-Bali dengan harga termurah
+Output: SELECT fp.* FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_code = a1.code INNER JOIN airports a2 ON fp.destination_code = a2.code WHERE a1.city = 'Jakarta' AND a2.city = 'Denpasar' LIMIT 1;
+"""
+
+        understanding_prompt_ = ChatPromptTemplate.from_messages([
+            ("system",understanding_prompt),
+            MessagesPlaceholder(variable_name="history"),
+            ("human","{question}")
+        ])
+
+        sql_prompt_ = ChatPromptTemplate.from_messages([
+            ("system",sql_prompt),
+            ("human", "Intent: {intent}\n\nGenerate SQL:")
+        ])
+
+        # === ✅ Buat instance history di luar agar bisa di-load dulu ===
+        history = InMemoryChatMessageHistory(
+            conn=conn, 
+            conversation_id=self.conversation_id
+        )
+        print("Success Get History")
+        
+        # === ✅ Load messages ke cache sebelum invoke ===
+        await history.aget_messages()
+        print("Success Load Message History")
+
+        def get_session_history(session_id: str):
+            """Harus return instance yang sama"""
+            return history
+
+        chain = understanding_prompt_ | self.llm | StrOutputParser()
+        understanding_chain = RunnableWithMessageHistory(
+            chain,
+            get_session_history=get_session_history,
+            input_messages_key="question",
+            history_messages_key="history",
         )
         
-        # Generate SQL using LLM
-        formatted_prompt = prompt.format(context=context, question=self.params.message, current_date=NOW.strftime("%Y-%m-%d"))
-        sql_query = self.llm(formatted_prompt).strip()
+        intent_output = await understanding_chain.ainvoke(
+            {
+                "question": self.params.message,
+                "context": context,
+                "current_date": NOW.strftime("%Y-%m-%d")
+            },
+            config={"configurable": {"session_id": self.params.conversation_id}}
+        )
         
-        # Clean up the response
-        if sql_query.startswith("```sql"):
-            sql_query = sql_query[6:]
-        if sql_query.endswith("```"):
-            sql_query = sql_query[:-3]
+        print(f"🧠 Intent: {intent_output}")
         
-        print("SQL Query :", sql_query)
+        # Extract intent
+        if "QUERY_INTENT:" in intent_output:
+            intent = intent_output.split("QUERY_INTENT:")[1].strip()
+        else:
+            intent = intent_output
+        
+        # Chain 2: Generate SQL tanpa memory (pure generation)
+        print("Generating SQL...")
+        sql_chain = sql_prompt_ | self.llm | StrOutputParser()
+        
+        raw_sql = await sql_chain.ainvoke({
+            "intent": intent,
+            "context": context
+        })
+        
+        print(f"🔍 Raw SQL: {raw_sql}")
+        
+        # Clean and validate
+        clean_sql = await self.clean_sql(raw_sql)
+        
+        if not self.validate_sql_output(clean_sql):
+            raise ValueError(f"Invalid SQL generated: {raw_sql}")
+        
+        print(f"✅ Clean SQL: {clean_sql}")
+        
+        # Simpan SQL ke memory (optional, untuk tracking)
+        # await history.aadd_message(AIMessage(content=f"[SQL Generated for: {question}]"))
+
+        # # Generate SQL using LLM
+        # formatted_prompt = prompt.format(context=context, question=self.params.message, current_date=NOW.strftime("%Y-%m-%d"))
+        # sql_query = self.llm(formatted_prompt).strip()
+        
+        # # Clean up the response
+        # if sql_query.startswith("```sql"):
+        #     sql_query = sql_query[6:]
+        # if sql_query.endswith("```"):
+        #     sql_query = sql_query[:-3]
 
         try:
             # Execute SQL query
-            results = await self.execute_query(conn=conn, sql_query=sql_query)
+            results = await self.execute_query(conn=conn, sql_query=clean_sql)
             print("Success executing SQL")
 
             # Language Detection
@@ -233,6 +419,8 @@ answer:
             return report
         
         except ProgrammingError as e:
+            await conn.rollback() 
+            print("---------ERROR---------")
             str_error = str(e)
 
             prompt_template = """
@@ -256,14 +444,15 @@ error message: {error_message}
             )
             formatted_prompt = prompt.format(question=self.params.message, error_message=str_error)
             report = self.model.invoke(formatted_prompt)
-
+            
             message_payload = CreateMessageRequest(
-                conversation_id=conversation_id,
+                conversation_id=self.conversation_id,
                 content=report.content,
                 message_type=MessageTypeEnum.answer,
-                token_usage=report.response_metadata.get("token_usage", {}),
+                token_usage={},
                 created_by=created_by,
                 metadata={}
+
             ).transform()
             await MessageRepository().create_message(conn=conn, payload=message_payload)
 
