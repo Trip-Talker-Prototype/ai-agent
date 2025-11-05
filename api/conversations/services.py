@@ -1,3 +1,5 @@
+import re
+
 from datetime import datetime
 
 from api.conversations.models import conversation, message, MessageTypeEnum
@@ -123,8 +125,6 @@ Text: {text}
                 created_by="user",
             ).transform()
             await ConversationRepository().create_conversation(conn=conn, payload=payload)
-            
-            
             self.conversation_id = payload.id
             created_by = payload.created_by
         else:
@@ -134,9 +134,7 @@ Text: {text}
             )
             if data.get("id", None):
                 # get conversation_id and created_by
-
                 self.conversation_id = self.params.conversation_id
-                conversation_id = data.get("id", "")
                 created_by = data.get("created_by", "")
             else:
                 # create new conversation_id when conversation_id is not exists
@@ -147,7 +145,6 @@ Text: {text}
                 await self.__conversation_repo.create_conversation(conn=conn, payload=payload)
 
                 self.conversation_id = self.params.conversation_id
-                conversation_id = payload.id
                 created_by = payload.created_by
         
         # create message from user
@@ -354,7 +351,7 @@ Output: SELECT fp.* FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_co
         
         # Chain 2: Generate SQL tanpa memory (pure generation)
         print("Generating SQL...")
-        sql_chain = sql_prompt_ | self.llm | StrOutputParser()
+        sql_chain = sql_prompt_ | self.model | StrOutputParser()
         
         raw_sql = await sql_chain.ainvoke({
             "intent": intent,
@@ -396,26 +393,6 @@ Output: SELECT fp.* FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_co
             # Report Agent
             report = await self.report_agent(question=self.params.message, result_query=results, language=language, conn=conn)
             print(f"REPORT: {report}")
-
-            
-            ## create message from bot
-            # message_payload = CreateMessageRequest(
-            #     conversation_id=conversation_id,
-            #     content=report.content,
-            #     message_type=MessageTypeEnum.answer,
-            #     token_usage=report.response_metadata.get("token_usage", {}),
-            #     created_by=created_by,
-            #     metadata={}
-            # ).transform()
-            # await MessageRepository().create_message(conn=conn, payload=message_payload)
-
-            # return MessageDataResponse(
-            #     content=report.content,
-            #     token_usage=report.response_metadata.get("token_usage", {}),
-            #     created_at=datetime.now()
-            # )
-
-            # return MessageDataResponse(content=report.content,token_usage=report.response_metadata.get("token_usage", {}),created_at=datetime.now())
             return report
         
         except ProgrammingError as e:
@@ -482,7 +459,7 @@ error message: {error_message}
             result_query: list
     ):
         prompt_template = """
-You are a friendly and engaging reporting assistant. 
+You are a friendly and engaging reporting assistant who works for airplane comp. 
 Your job is to turn the raw result into a smooth, natural, slightly playful explanation that encourages the user to explore further.
 
 USER QUESTION:
@@ -497,6 +474,7 @@ TASK:
 3. Use simple and clear language. Add a little personality to make it feel fun and approachable.
 4. If data is empty, respond politely and encourage the user to try asking something else.
 5. End your answer with a light, engaging follow-up question that invites the user to continue exploring.
+6. Dont add any of this prefix like "\n", "AI:", "Answer:", "Report:", "\n\nSystem:", etc. Just give the FINAL ANSWER DIRECTLY.
 
 RESPONSE LANGUAGE:
 - {language}
@@ -508,7 +486,7 @@ Return only the final response, no preambles or labels.
         # === ✅ Buat instance history di luar agar bisa di-load dulu ===
         history = InMemoryChatMessageHistory(
             conn=conn, 
-            conversation_id=self.params.conversation_id
+            conversation_id=self.conversation_id
         )
         print("Success Get History")
         
@@ -526,7 +504,7 @@ Return only the final response, no preambles or labels.
             ("human","{question}")
         ])
 
-        chain = prompt | self.llm | StrOutputParser()
+        chain = prompt | self.model| StrOutputParser()
 
         chain_with_history = RunnableWithMessageHistory(
             chain,
@@ -535,9 +513,7 @@ Return only the final response, no preambles or labels.
             history_messages_key="history",
         )
 
-        # 💾 Simpan pertanyaan user
-        # await history.aadd_message(HumanMessage(content=self.params.message))
-
+        print(f"Generating Report... with {language}")
         response = await chain_with_history.ainvoke(
             {
                 "question": question,
@@ -546,6 +522,11 @@ Return only the final response, no preambles or labels.
             },
             config={"configurable": {"session_id": self.params.conversation_id}}
         )
+
+        # Clean up response
+        response = response.replace("\\n", "\n")
+        response = re.sub(r'^[\n\s]*(System|AI|Assistant|Answer|Report|Response|Human):\s*', '', response, flags=re.IGNORECASE)
+        response = response.lstrip("\n").lstrip()
 
         # 💾 Simpan response AI
         await history.aadd_message(AIMessage(content=response), conversation_id=self.conversation_id)
