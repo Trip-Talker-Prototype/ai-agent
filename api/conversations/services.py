@@ -391,7 +391,7 @@ Output: SELECT fp.* FROM flight_prices fp INNER JOIN airports a1 ON fp.origin_co
             print("Success collect Language")
 
             # Report Agent
-            report = await self.report_agent(question=self.params.message, result_query=results, language=language, conn=conn)
+            report = await self.report_agent(question=self.params.message, result_query=results, conn=conn)
             print(f"REPORT: {report}")
             return report
         
@@ -454,33 +454,30 @@ error message: {error_message}
     async def report_agent(
             self,
             question: str,
-            language: str,
             conn: AsyncConnection,
             result_query: list
     ):
         prompt_template = """
-You are a friendly and engaging reporting assistant who works for airplane comp. 
-Your job is to turn the raw result into a smooth, natural, slightly playful explanation that encourages the user to explore further.
+Anda adalah asisten pelaporan yang ramah dan menarik yang bekerja untuk perusahaan penerbangan.Tugas Anda adalah mengubah hasil mentah menjadi penjelasan yang lancar, alami, dan sedikit playful yang mendorong pengguna untuk menjelajahi lebih lanjut.
 
-USER QUESTION:
+PERTANYAAN PENGGUNA:
 {question}
 
-RAW ANSWER / DATA:
+JAWABAN MENTAH / DATA:
 {result_query}
 
-TASK:
-1. Rewrite the answer in a friendly, conversational tone — as if you are explaining to a friend.
-2. Keep all numbers and facts accurate. Do not invent data.
-3. Use simple and clear language. Add a little personality to make it feel fun and approachable.
-4. If data is empty, respond politely and encourage the user to try asking something else.
-5. End your answer with a light, engaging follow-up question that invites the user to continue exploring.
-6. Dont add any of this prefix like "\n", "AI:", "Answer:", "Report:", "\n\nSystem:", etc. Just give the FINAL ANSWER DIRECTLY.
+TUGAS:
+1. Tulis ulang jawaban dengan nada ramah dan santai — seolah-olah Anda sedang menjelaskan kepada teman.
+2. Pastikan semua angka dan fakta akurat. Jangan membuat data palsu.
+3. Gunakan bahasa yang sederhana dan jelas. Tambahkan sedikit kepribadian untuk membuatnya terasa menyenangkan dan mudah didekati.
+4. Jika data kosong, berikan tanggapan yang sopan dan dorong pengguna untuk mencoba bertanya hal lain.
+5. Akhiri jawaban Anda dengan pertanyaan lanjutan yang ringan dan menarik untuk mendorong pengguna melanjutkan eksplorasi.
+6. Jangan tambahkan prefiks seperti “\n”, “AI:”, “Answer:”, “Report:”, “\n\nSystem:”, dll. Berikan JAWABAN AKHIR LANGSUNG.
 
-RESPONSE LANGUAGE:
-- {language}
+BAHASA TANGGAPAN:
+- Bahasa Indonesia
 
-OUTPUT:
-Return only the final response, no preambles or labels.
+OUTPUT:Kembalikan hanya tanggapan akhir, tanpa pengantar atau label.
 """
 
         # === ✅ Buat instance history di luar agar bisa di-load dulu ===
@@ -513,12 +510,11 @@ Return only the final response, no preambles or labels.
             history_messages_key="history",
         )
 
-        print(f"Generating Report... with {language}")
+        print(f"Generating Report...")
         response = await chain_with_history.ainvoke(
             {
                 "question": question,
                 "result_query": result_query,
-                "language": language
             },
             config={"configurable": {"session_id": self.params.conversation_id}}
         )
