@@ -532,6 +532,7 @@ Return only the final response, no preambles or labels.
         await history.aadd_message(AIMessage(content=response), conversation_id=self.conversation_id)
 
         return MessageDataResponse(
+            conversation_id=self.conversation_id,
             content=response,
             token_usage={},
             created_at=datetime.now()

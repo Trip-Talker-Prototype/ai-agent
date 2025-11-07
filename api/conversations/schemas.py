@@ -54,8 +54,7 @@ class MessageDataResponse(BaseModel):
     """
     Response model for getting the list with pagination
     """
-    # id: UUID
-    # conversation_id: UUID
+    conversation_id: UUID
     content: str
     metadata: dict | None = None
     token_usage: dict | None = None
